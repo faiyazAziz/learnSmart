@@ -27,7 +27,8 @@ SECRET_KEY = 'django-insecure-tjtijlpx@)gk!h4p1375hmc5igkww1qrjdg1c2ghm2_apkrc_^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['10.103.11.251',"127.0.0.1",
+    "localhost",]
 
 
 # Application definition
@@ -41,7 +42,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders', 
     'rest_framework',
-    'api'
+    'rest_framework.authtoken',
+    'api',
+    'authentication'
 ]
 
 MIDDLEWARE = [
@@ -57,8 +60,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOWED_ORIGINS = ["https://9000-firebase-studio-1754829289303.cluster-htdgsbmflbdmov5xrjithceibm.cloudworkstations.dev/?embedded=0&monospaceUid=180892"]
-
+CORS_ALLOWED_ALL_ORIGINS = True
 ROOT_URLCONF = 'learnsmart.urls'
 
 TEMPLATES = [
@@ -109,6 +111,13 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+}
+
+
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
@@ -134,3 +143,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Gemini API Key
 GEMINI_API_KEY = "AIzaSyAYb_ysIlEz-XxSex1ZOGE7kgNlRvnW9Og"
+
+
+# Console Email Backend for Development
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
