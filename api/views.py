@@ -202,16 +202,20 @@ class QuizSubmitView(generics.GenericAPIView):
 
         result_serializer = QuizSessionResultSerializer(session)
         return Response(result_serializer.data, status=status.HTTP_200_OK)
-     
+
+class BookListView(generics.ListAPIView):
+    """
+    Retrieves a list of books for the authenticated user.
+    """
+    serializer_class = BookSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Ensure users can only access their own books."""
+        return Book.objects.filter(user=self.request.user)
         
         
-        
-        
-        
-        
-        
-        
-        
+      
         
         
         

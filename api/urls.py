@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import BookUploadView, TopicListView, QuizCreateView, QuizDetailView, QuizSubmitView
+from .views import BookUploadView, TopicListView, QuizCreateView, QuizDetailView, QuizSubmitView, BookListView
 
 urlpatterns = [
     # Endpoint for uploading a book
@@ -8,4 +8,5 @@ urlpatterns = [
     path('quizzes/create/', QuizCreateView.as_view(), name='quiz-create'),
     path('quizzes/<int:pk>/', QuizDetailView.as_view(), name='quiz-detail'),
     path('quizzes/<int:quiz_pk>/submit/', QuizSubmitView.as_view(), name='quiz-submit'),
+    path('books/', BookListView.as_view(), name='book-list'),
 ]
