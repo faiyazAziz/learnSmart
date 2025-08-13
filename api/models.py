@@ -1,5 +1,4 @@
 # api/models.py
-
 from django.db import models
 from django.contrib.auth.models import User
 
@@ -15,16 +14,18 @@ class Book(models.Model):
         choices=[('pending', 'Pending'), ('processing', 'Processing'), ('complete', 'Complete')]
     )
     def __str__(self):
-        return self.title
+        return f"{self.id}: {self.title}"
 
 class Topic(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='topics')
     title = models.CharField(max_length=255)
+    accuracy = models.FloatField(default=-1.0)
+    accuracy_last_updated = models.DateTimeField(auto_now_add=True)
+    correct_answers = models.PositiveIntegerField(default=0)
+    wrong_answers = models.PositiveIntegerField(default=0)
     def __str__(self):
-        return f"{self.title} (Book: {self.book.title})"
+        return f"{self.id}: {self.title} (Book: {self.book.title})"
 
-
-# --- MODEL CHANGES ARE BELOW ---
 
 class Quiz(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='quizzes')
@@ -34,7 +35,7 @@ class Quiz(models.Model):
     # The relationship is now handled by the ForeignKey in the Question model.
 
     def __str__(self):
-        return f"Quiz for {self.user.username} on Book: {self.book.title}"
+        return f"{self.id}: Quiz for {self.user.username} on Book: {self.book.title}"
 
 class Question(models.Model):
     # UPDATED: A Question now belongs to exactly one Quiz.
@@ -47,9 +48,8 @@ class Question(models.Model):
     explanation = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return self.question_text[:50]
+        return f"{self.id}: {self.question_text[:50]}"
 
-# These models are now correct because the ambiguity is gone.
 class QuizSession(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='quiz_sessions')
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='sessions')
@@ -57,7 +57,7 @@ class QuizSession(models.Model):
     completed_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Attempt by {self.user.username} on Quiz {self.quiz.id}"
+        return f"{self.id}: Attempt by {self.user.username} on Quiz {self.quiz.id}"
 
 class UserAnswer(models.Model):
     quiz_session = models.ForeignKey(QuizSession, on_delete=models.CASCADE, related_name='user_answers')
@@ -66,4 +66,17 @@ class UserAnswer(models.Model):
     is_correct = models.BooleanField()
 
     def __str__(self):
-        return f"Answer for Q:{self.question.id} in Session:{self.quiz_session.id}"
+        return f"{self.id}: Answer for Q:{self.question.id} in Session:{self.quiz_session.id}"
+
+
+class RevisionNote(models.Model):
+    """
+    Stores a single, personalized revision note for a user.
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='revision_note')
+    content = models.TextField()
+    last_generated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.id}: Revision Note for {self.user.username}"
+

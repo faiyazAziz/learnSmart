@@ -3,8 +3,11 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .models import Book, Topic, Quiz, Question,QuizSession, UserAnswer
-from .serializers import BookSerializer, BookUploadSerializer, TopicSerializer, QuizSerializer, QuizCreateSerializer, QuizDetailSerializer,QuizSubmitSerializer,QuizSessionResultSerializer
-from .services import extract_text_from_pdf, get_topics_from_text,get_questions_for_topic
+from .serializers import (BookSerializer, BookUploadSerializer, TopicSerializer, QuizSerializer, 
+                          QuizCreateSerializer, QuizDetailSerializer,QuizSubmitSerializer,QuizSessionResultSerializer,
+                          QuizListSerializer,QuizSessionListSerializer)
+from .services import extract_text_from_pdf, get_topics_from_text,get_questions_for_topic,update_topic_accuracy_for_user
+from django.db.models import F
 
 class BookUploadView(generics.CreateAPIView):
     """
@@ -155,12 +158,10 @@ class QuizDetailView(generics.RetrieveAPIView):
         """Ensure users can only access their own quizzes."""
         return Quiz.objects.filter(user=self.request.user)
 
-
 # UPDATED VIEW: To handle the submission of answers
 class QuizSubmitView(generics.GenericAPIView):
     """
-    Handles the submission of a completed quiz, calculates the score,
-    and returns a detailed breakdown of the results.
+    Handles quiz submission, updates topic counters, and triggers accuracy calculation.
     """
     serializer_class = QuizSubmitSerializer
     permission_classes = [IsAuthenticated]
@@ -173,12 +174,9 @@ class QuizSubmitView(generics.GenericAPIView):
 
         session = QuizSession.objects.create(user=request.user, quiz=quiz)
         correct_answers_count = 0
-        
-        # Create a dictionary of submitted answers for quick lookup
         answers_dict = {ans['question_id']: ans['selected_answer'] for ans in submitted_answers}
-        
-        # Get all questions for the quiz at once
         quiz_questions = quiz.questions.all()
+        topics_in_quiz = set()
 
         for question in quiz_questions:
             selected_answer = answers_dict.get(question.id)
@@ -191,14 +189,30 @@ class QuizSubmitView(generics.GenericAPIView):
             UserAnswer.objects.create(
                 quiz_session=session,
                 question=question,
-                selected_answer=selected_answer or "", # Store empty string if not answered
+                selected_answer=selected_answer or "",
                 is_correct=is_correct
             )
+            
+            if question.topic:
+                # --- NEW, MORE EFFICIENT LOGIC ---
+                # Increment the correct or wrong counter directly
+                if is_correct:
+                    Topic.objects.filter(id=question.topic.id).update(correct_answers=F('correct_answers') + 1)
+                else:
+                    Topic.objects.filter(id=question.topic.id).update(wrong_answers=F('wrong_answers') + 1)
+                
+                topics_in_quiz.add(question.topic.id)
+                # --- END NEW LOGIC ---
 
+        # Calculate session score
         if quiz_questions.count() > 0:
             score = (correct_answers_count / quiz_questions.count()) * 100
             session.score = round(score, 2)
             session.save()
+
+        # Update the accuracy for each topic covered
+        for topic_id in topics_in_quiz:
+            update_topic_accuracy_for_user(topic_id) # No longer need to pass the user
 
         result_serializer = QuizSessionResultSerializer(session)
         return Response(result_serializer.data, status=status.HTTP_200_OK)
@@ -214,13 +228,59 @@ class BookListView(generics.ListAPIView):
         """Ensure users can only access their own books."""
         return Book.objects.filter(user=self.request.user)
         
-        
+class QuizListView(generics.ListAPIView):
+    """
+    Lists all quizzes for the authenticated user.
+    Can be filtered by book using a query parameter, e.g., /api/quizzes/?book_id=1
+    """
+    serializer_class = QuizListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        print(user)
+        queryset = Quiz.objects.filter(user=user).order_by('-created_at')
+
+        # Check for the 'book_id' query parameter in the URL
+        book_id = self.request.query_params.get('book_id')
+        if book_id is not None:
+            # If it exists, filter the queryset further
+            queryset = queryset.filter(book__id=book_id)
+
+        return queryset    
       
+class QuizSessionListView(generics.ListAPIView):
+    """
+    Lists all past attempts (sessions) for a specific quiz.
+    This allows a user to see their history for a quiz they might retake.
+    """
+    serializer_class = QuizSessionListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Returns a list of all QuizSession objects for the quiz specified
+        in the URL, ensuring it belongs to the logged-in user.
+        """
+        quiz_pk = self.kwargs['quiz_pk']
+        return QuizSession.objects.filter(
+            quiz__id=quiz_pk,
+            user=self.request.user
+        ).order_by('-completed_at')        
         
-        
-        
-        
-        
+class QuizSessionDetailView(generics.RetrieveAPIView):
+    """
+    Retrieves the detailed results of a single quiz session, including
+    each question, the user's answer, and whether it was correct.
+    """
+    serializer_class = QuizSessionResultSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Ensure users can only view the results of their own quiz sessions.
+        """
+        return QuizSession.objects.filter(user=self.request.user)
         
         
         
