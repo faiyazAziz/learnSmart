@@ -92,13 +92,37 @@ class UserAnswerResultSerializer(serializers.ModelSerializer):
         
 class QuizListSerializer(serializers.ModelSerializer):
     """
-    A lightweight serializer for listing quizzes, showing book title instead of just ID.
+    A serializer for listing quizzes, now including the total number of questions
+    and a list of topics covered.
     """
     book_title = serializers.CharField(source='book.title', read_only=True)
+    # NEW: Custom fields to compute additional data
+    total_questions = serializers.SerializerMethodField()
+    topics = serializers.SerializerMethodField()
 
     class Meta:
         model = Quiz
-        fields = ['id', 'book', 'book_title', 'created_at']
+        # Add the new fields to the list
+        fields = ['id', 'book', 'book_title', 'created_at', 'total_questions', 'topics']
+
+    def get_total_questions(self, obj):
+        """
+        Calculates the total number of questions for the quiz instance.
+        'obj' here is the Quiz instance.
+        """
+        return obj.questions.count()
+
+    def get_topics(self, obj):
+        """
+        Gathers a list of unique topic titles covered in the quiz.
+        """
+        # We query the topics related to the questions in this specific quiz,
+        # get their titles, and return only the unique ones.
+        return list(
+            obj.questions.select_related('topic')
+                         .values_list('topic__title', flat=True)
+                         .distinct()
+        )
         
 class QuizSessionResultSerializer(serializers.ModelSerializer):
     user_answers = UserAnswerResultSerializer(many=True, read_only=True)
@@ -116,7 +140,18 @@ class QuizSessionListSerializer(serializers.ModelSerializer):
         model = QuizSession
         fields = ['id', 'score', 'completed_at']
 
+class IncorrectQuestionSerializer(serializers.ModelSerializer):
+    """
+    A serializer to display the details of questions the user answered incorrectly.
+    It shows the user's wrong answer and the correct answer for review.
+    """
+    # We nest the QuestionResultSerializer to show all details of the question
+    question = QuestionResultSerializer(read_only=True)
 
+    class Meta:
+        model = UserAnswer
+        # We only need to show the question details and the user's wrong answer
+        fields = ['question', 'selected_answer']
 
 
 

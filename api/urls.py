@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (BookUploadView, TopicListView, QuizCreateView, QuizDetailView, 
-                    QuizSubmitView, BookListView, QuizListView, QuizSessionListView,QuizSessionDetailView)
+                    QuizSubmitView, BookListView, QuizListView, QuizSessionListView,
+                    QuizSessionDetailView, IncorrectQuestionsListView)
 
 urlpatterns = [
     # Endpoint for Book related
@@ -16,5 +17,7 @@ urlpatterns = [
     path('quizzes/<int:quiz_pk>/sessions/', QuizSessionListView.as_view(), name='quiz-sessions'),
     
     path('quiz-sessions/<int:pk>/', QuizSessionDetailView.as_view(), name='quiz-session-detail'),
+    
+    path('insights/incorrect-questions/', IncorrectQuestionsListView.as_view(), name='incorrect-questions-list'),
 ]
 

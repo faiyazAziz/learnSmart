@@ -54,10 +54,10 @@ def get_topics_from_text(text):
     data = _call_gemini_api(prompt)
     return data.get("topics", []) if data else []
 
-def get_questions_for_topic(topic_title, full_text):
+def get_questions_for_topic(topic_title, full_text, num_of_question):
     """Generates quiz questions for a specific topic using the LLM."""
     prompt = f"""
-    You are an expert quiz creator. Based ONLY on the provided text, generate 2 multiple-choice questions for the topic: "{topic_title}".
+    You are an expert quiz creator. Based ONLY on the provided text, generate {num_of_question} multiple-choice questions for the topic: "{topic_title}".
 
     Instructions:
     1. Each question must have 4 options (A, B, C, D).

@@ -5,9 +5,10 @@ from django.shortcuts import get_object_or_404
 from .models import Book, Topic, Quiz, Question,QuizSession, UserAnswer
 from .serializers import (BookSerializer, BookUploadSerializer, TopicSerializer, QuizSerializer, 
                           QuizCreateSerializer, QuizDetailSerializer,QuizSubmitSerializer,QuizSessionResultSerializer,
-                          QuizListSerializer,QuizSessionListSerializer)
+                          QuizListSerializer,QuizSessionListSerializer,IncorrectQuestionSerializer)
 from .services import extract_text_from_pdf, get_topics_from_text,get_questions_for_topic,update_topic_accuracy_for_user
 from django.db.models import F
+from django.db.models import Max
 
 class BookUploadView(generics.CreateAPIView):
     """
@@ -95,6 +96,13 @@ class QuizCreateView(generics.CreateAPIView):
 
         topic_ids = serializer.validated_data['topic_ids']
         book_id = serializer.validated_data['book_id']
+        
+        # print(len(topic_ids))
+        num_of_question = 20/len(topic_ids)
+        if len(topic_ids) == 1:
+            num_of_question = 10
+        if len(topic_ids) >= 11:
+            num_of_question = 2
 
         # 1. Verify that the book and topics belong to the user
         book = get_object_or_404(Book, id=book_id, user=request.user)
@@ -112,7 +120,7 @@ class QuizCreateView(generics.CreateAPIView):
             for topic in topics:
                 print(f"Generating questions for topic: {topic.title}")
                 # Use the book's stored full_text for context
-                questions_data = get_questions_for_topic(topic.title, book.full_text)
+                questions_data = get_questions_for_topic(topic.title, book.full_text, num_of_question)
 
                 if not questions_data:
                     print(f"Warning: Could not generate questions for topic ID {topic.id}.")
@@ -282,7 +290,29 @@ class QuizSessionDetailView(generics.RetrieveAPIView):
         """
         return QuizSession.objects.filter(user=self.request.user)
         
+class IncorrectQuestionsListView(generics.ListAPIView):
+    """
+    Provides a list of all questions the authenticated user has ever
+    answered incorrectly, for review purposes.
+    """
+    serializer_class = IncorrectQuestionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        latest_attempts = (
+            UserAnswer.objects
+            .filter(
+                quiz_session__user=self.request.user,
+                is_correct=False
+            )
+            .values('question')
+            .annotate(latest_attempt_id=Max('id'))
+            .values_list('latest_attempt_id', flat=True)
+        )
+
+        return UserAnswer.objects.filter(id__in=latest_attempts).order_by('-quiz_session__completed_at')
         
+     
         
           
     
